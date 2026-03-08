@@ -1,0 +1,83 @@
+# ============================================================
+# SECRETS & ENVIRONMENT
+# ============================================================
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# ============================================================
+# SENSITIVE INFRASTRUCTURE FILES
+# ============================================================
+# SSL certificates
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+
+# HTTP Basic Auth passwords
+nginx/auth/.htpasswd_admin
+registry/auth/htpasswd
+
+# AI prompt files (internal, not for public)
+backend/prompt.md
+frontend/prompt.md
+
+# ============================================================
+# PYTHON
+# ============================================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+
+# ============================================================
+# NODE / FRONTEND
+# ============================================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+*.tsbuildinfo
+
+# ============================================================
+# DOCKER & VOLUMES
+# ============================================================
+# Named volume data (if mounted locally)
+postgres_data/
+pgadmin_data/
+registry_data/
+
+# ============================================================
+# IDE & EDITORS
+# ============================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ============================================================
+# OS
+# ============================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# MISC
+# ============================================================
+*.bak
+*.tmp
