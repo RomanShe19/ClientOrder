@@ -1,6 +1,6 @@
-# Сайт для обработки заказов от покупателей
+# ClientOrder — Сайт для обработки заказов от покупателей
 
-Готовая к продакшену самохостируемая платформа для приёма и обработки заказов. Покупатели заполняют многошаговую форму с контактными данными, описанием задачи и бюджетом; заказы сохраняются в PostgreSQL с полной аналитикой поведения (время на странице, тепловая карта курсора, клики по кнопкам). Спроектирована для работы на **VPS с 1 ГБ RAM** внутри Docker с приватным реестром образов и автоматическими обновлениями.
+Готовая к продакшену самохостируемая платформа для приёма и обработки заказов. Покупатели заполняют многошаговую форму с контактными данными, описанием задачи и бюджетом; заказы сохраняются в PostgreSQL с полной аналитикой поведения (время на странице, тепловая карта курсора, клики по кнопкам). Встроенная админ-панель с JWT-аутентификацией для управления заявками и конфигурацией. Спроектирована для работы на **VPS с 1 ГБ RAM** внутри Docker.
 
 ---
 
@@ -10,20 +10,21 @@
 Интернет
     │
     ▼
-[ Nginx :80/:443 ]  ← обратный прокси + Basic Auth для /admin
+[ Nginx :80/:443 ]  ← обратный прокси
     │
-    ├─► /           → [ Frontend ] React SPA (раздаётся nginx:alpine)
+    ├─► /           → [ Frontend ] React SPA (форма заказов)
+    ├─► /admin/*    → [ Frontend ] Админ-панель (JWT Auth)
     ├─► /api/       → [ Backend  ] FastAPI + SQLAlchemy (async)
     ├─► /docs       → [ Backend  ] Swagger UI
-    ├─► /admin/     → [ pgAdmin  ] Веб-интерфейс PostgreSQL (Basic Auth)
-    └─► /v2/        → [ Registry ] Приватный Docker-реестр
-                              │
-                     [ Watchtower ] — следит за реестром, авто-деплой при новых образах
+    ├─► /pgadmin/   → [ pgAdmin  ] (опционально, Basic Auth)
+    └─► /v2/        → [ Registry ] (опционально, приватный Docker-реестр)
 ```
 
 **Сети:**
-- `frontend-network` — nginx, frontend, backend, pgAdmin, registry
+- `frontend-network` — nginx, frontend, backend
 - `backend-network` (internal) — только backend + PostgreSQL; БД никогда не доступна снаружи
+
+> pgAdmin и Docker Registry отключены в `docker-compose.yml` по умолчанию. Раскомментировать при необходимости.
 
 ---
 
@@ -69,23 +70,24 @@ cp frontend/.env.example frontend/.env
 | Переменная | Описание |
 |---|---|
 | `POSTGRES_PASSWORD` | Пароль PostgreSQL |
-| `PGADMIN_PASSWORD` | Пароль веб-интерфейса pgAdmin |
-| `NGINX_ADMIN_PASSWORD` | Пароль HTTP Basic Auth для `/admin/` |
-| `REGISTRY_PASSWORD` | Пароль для Docker Registry |
-| `SECRET_KEY` | Случайный секрет бэкенда (сгенерировать: `openssl rand -hex 32`) |
+| `SECRET_KEY` | Случайный секрет бэкенда (`openssl rand -hex 32`) |
+| `JWT_SECRET_KEY` | Секрет для JWT (мин. 32 символа, `openssl rand -hex 32`) |
+| `PGADMIN_PASSWORD` | Пароль pgAdmin (если включён) |
+| `NGINX_ADMIN_PASSWORD` | Пароль Basic Auth для `/pgadmin/` (если включён) |
+| `REGISTRY_PASSWORD` | Пароль Docker Registry (если включён) |
 
 В `backend/.env`:
 - Обновить `DATABASE_URL` с реальным `POSTGRES_PASSWORD`
 - Установить `CORS_ORIGINS` на свой домен, например `["https://your-domain.com"]`
 
-### 3. Запустить скрипт первоначальной настройки
+### 3. Запустить скрипт первоначальной настройки (если используются pgAdmin/Registry)
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-Скрипт сгенерирует хэши паролей для Nginx Basic Auth и Docker Registry из значений в `.env`.
+Скрипт генерирует htpasswd для Nginx (Basic Auth) и Docker Registry. Пропустить, если эти сервисы отключены.
 
 ### 4. Запустить все сервисы
 
@@ -97,11 +99,16 @@ docker compose up -d
 
 | URL | Сервис |
 |---|---|
-| `http://your-server/` | React-приложение |
+| `http://your-server/` | Форма заказов (React SPA) |
+| `http://your-server/admin/` | Админ-панель (JWT Auth) |
 | `http://your-server/api/` | Backend API |
 | `http://your-server/docs` | Swagger UI |
-| `http://your-server/admin/` | pgAdmin (Basic Auth) |
+
+Опционально (раскомментировать в `docker-compose.yml` и `nginx.conf`):
+| `http://your-server/pgadmin/` | pgAdmin (Basic Auth) |
 | `http://your-server/v2/` | Docker Registry |
+
+Подробнее об админ-панели: [frontend/ADMIN_README.md](frontend/ADMIN_README.md)
 
 ---
 
@@ -109,74 +116,91 @@ docker compose up -d
 
 ```
 ClientOrder/
-├── .env.example            # Шаблон корневых переменных (пароли, реестр, watchtower)
-├── docker-compose.yml      # 7 сервисов с лимитами ресурсов
-├── setup.sh                # Скрипт первоначальной настройки
+├── .env.example            # Шаблон переменных окружения
+├── docker-compose.yml      # Сервисы: nginx, frontend, backend, postgres, watchtower
+├── setup.sh                # Скрипт настройки htpasswd (pgAdmin, Registry)
+├── deploy-admin-updates.sh # Скрипт деплоя обновлений админ-панели
 │
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── .env.example
 │   ├── init.sql            # Ручная инициализация БД (запасной вариант)
+│   ├── scripts/
+│   │   └── seed_test_leads.sql   # Тестовые заявки для проверки сортировки
 │   └── app/
 │       ├── main.py
-│       ├── core/           # Конфиг, движок базы данных
-│       ├── models/         # ORM-модели SQLAlchemy
-│       ├── schemas/        # Pydantic-схемы
-│       ├── crud/           # Асинхронные CRUD-операции
-│       └── routes/         # FastAPI-роутеры
+│       ├── core/           # Конфиг, движок БД
+│       ├── models/         # ORM-модели (lead, analytics, admin, session_tracking)
+│       ├── schemas/
+│       ├── crud/
+│       ├── routes/         # lead, analytics, admin, auth, admin_panel, session_tracking
+│       └── services/       # lead_scoring и др.
 │
 ├── frontend/
 │   ├── Dockerfile
 │   ├── .env.example
-│   ├── nginx.conf          # Раздача статики
+│   ├── nginx.conf
+│   ├── ADMIN_README.md     # Документация админ-панели
 │   ├── package.json
 │   └── src/
-│       ├── components/     # UI-компоненты, шаги формы, layout
-│       ├── hooks/          # useLeadSubmit, useAnalytics, useFormTracking
-│       ├── services/       # API-клиент, сервисы лидов и аналитики
-│       ├── types/          # TypeScript-интерфейсы
-│       └── utils/          # Валидаторы, утилиты аналитики
+│       ├── components/     # Форма заказов, UI-компоненты
+│       ├── admin/          # Админ-панель: Leads, Dashboard, Settings, Admins
+│       ├── hooks/
+│       ├── services/
+│       ├── types/
+│       └── utils/
 │
 ├── nginx/
-│   ├── nginx.conf          # Конфиг обратного прокси
-│   ├── ssl/                # SSL-сертификаты (не хранятся в git)
-│   └── auth/               # htpasswd-файлы (не хранятся в git)
+│   ├── nginx.conf          # Обратный прокси, rate limiting
+│   ├── ssl/                # SSL-сертификаты (не в git)
+│   └── auth/               # htpasswd (не в git)
 │
 └── registry/
-    └── auth/               # htpasswd Docker Registry (не хранится в git)
+    └── auth/               # htpasswd Registry (не в git)
 ```
 
 ---
 
 ## Справка по API
 
-### Лиды
+### Публичные (форма заказов)
 
 | Метод | Эндпоинт | Описание |
 |---|---|---|
 | `POST` | `/api/leads/` | Создать заявку |
-| `GET` | `/api/leads/` | Список всех заявок |
-| `GET` | `/api/leads/{id}` | Получить заявку по ID |
-| `PATCH` | `/api/leads/{id}` | Обновить заявку |
-| `DELETE` | `/api/leads/{id}` | Удалить заявку |
+| `POST` | `/api/analytics/` | Отправить аналитику |
 
-### Аналитика
+### Аутентификация админ-панели (`/api/v1/auth`)
 
 | Метод | Эндпоинт | Описание |
 |---|---|---|
-| `POST` | `/api/analytics/` | Создать запись аналитики |
-| `GET` | `/api/analytics/{lead_id}` | Получить аналитику по заявке |
-| `PATCH` | `/api/analytics/{lead_id}` | Обновить аналитику |
+| `GET` | `/registration-available` | Доступна ли регистрация |
+| `POST` | `/register` | Регистрация первого админа |
+| `POST` | `/login` | Вход (JWT в HttpOnly cookies) |
+| `POST` | `/logout` | Выход |
+| `POST` | `/refresh` | Обновление токена |
+| `GET` | `/me` | Текущий админ |
 
-### Конфигурация (Admin)
+### Админ-API (`/api/v1/admin`, JWT)
 
 | Метод | Эндпоинт | Описание |
 |---|---|---|
-| `GET` | `/api/admin/configs/` | Получить все конфиг-записи |
-| `POST` | `/api/admin/configs/` | Создать конфиг-запись |
-| `PATCH` | `/api/admin/configs/{key}` | Обновить конфиг-запись |
-| `DELETE` | `/api/admin/configs/{key}` | Удалить конфиг-запись |
+| `GET` | `/dashboard/stats` | Статистика дашборда |
+| `GET` | `/leads` | Список заявок (фильтры, пагинация) |
+| `GET` | `/leads/{id}` | Детали заявки |
+| `GET` | `/list` | Список админов |
+| `PUT` | `/{id}` | Обновить админа |
+| `DELETE` | `/{id}` | Удалить админа |
+
+### Конфигурация (`/api/admin/configs`)
+
+| Метод | Эндпоинт | Описание |
+|---|---|---|
+| `GET` | `/` | Получить конфиг |
+| `POST` | `/` | Создать запись |
+| `PATCH` | `/{key}` | Обновить запись |
+| `DELETE` | `/{key}` | Удалить запись |
 
 ### Health Check
 
@@ -184,7 +208,7 @@ ClientOrder/
 |---|---|---|
 | `GET` | `/api/health` | Проверка работоспособности |
 
-Полная интерактивная документация доступна по `/docs` (Swagger UI) и `/redoc`.
+Полная документация: `/docs` (Swagger UI) и `/redoc`. Подробнее об админ-панели: [frontend/ADMIN_README.md](frontend/ADMIN_README.md).
 
 ---
 
@@ -196,10 +220,10 @@ ClientOrder/
 | frontend | 32 МБ | 0.15 |
 | backend | 192 МБ | 0.50 |
 | postgres | 256 МБ | 0.50 |
-| pgadmin | 256 МБ | 0.30 |
-| registry | 64 МБ | 0.25 |
 | watchtower | 64 МБ | 0.15 |
-| **Итого** | **~912 МБ** | **~2.15** |
+| **Итого (базовый)** | **~592 МБ** | **~1.6** |
+
+Опционально: pgAdmin 256 МБ, Registry 64 МБ — при включении в `docker-compose.yml`.
 
 ---
 
@@ -222,9 +246,21 @@ docker compose restart nginx
 
 ---
 
-## Сборка и публикация образов
+## Деплой обновлений админ-панели
 
-Проект использует приватный Docker Registry, запущенный на том же сервере.
+Быстрая пересборка и перезапуск только backend и frontend:
+
+```bash
+./deploy-admin-updates.sh
+```
+
+После деплоя сделать жёсткое обновление страницы (Ctrl+Shift+R), чтобы сбросить кэш.
+
+---
+
+## Сборка и публикация образов (при включённом Registry)
+
+Проект поддерживает приватный Docker Registry на том же сервере.
 
 ```bash
 # Авторизоваться в локальном реестре

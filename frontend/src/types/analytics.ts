@@ -31,3 +31,19 @@ export interface SessionData {
   screen_height: number;
   user_agent: string;
 }
+
+export interface CursorPosition {
+  x: number;
+  y: number;
+  ts: number;
+}
+
+export interface SessionTrackingPayload {
+  session_id: string;
+  page_time_seconds: number;
+  button_clicks: Record<string, number>;
+  cursor_positions: CursorPosition[];
+  cursor_heatmap: Record<string, number>;
+  session_data: Record<string, unknown>;
+  lead_id?: number;
+}

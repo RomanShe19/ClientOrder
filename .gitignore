@@ -22,6 +22,7 @@ registry/auth/htpasswd
 # AI prompt files (internal, not for public)
 backend/prompt.md
 frontend/prompt.md
+frontend/prompt2.md
 
 # ============================================================
 # PYTHON

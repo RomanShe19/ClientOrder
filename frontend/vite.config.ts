@@ -29,8 +29,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom'],
+          vendor: ['react', 'react-dom', 'react-router-dom'],
           forms: ['react-hook-form'],
+          admin: ['zustand', 'date-fns'],
         },
       },
     },

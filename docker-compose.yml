@@ -17,8 +17,8 @@ services:
     networks:
       - frontend-network
     depends_on:
-      - registry
-      - pgadmin
+      # - registry    # отключено, раскомментировать при необходимости
+      # - pgadmin     # отключено, раскомментировать при необходимости
       - backend
       - frontend
     restart: unless-stopped
@@ -96,39 +96,40 @@ services:
       com.centurylinklabs.watchtower.enable: "false"
 
   # ============================================================
-  # pgAdmin — доступ только через Nginx + Basic Auth
+  # pgAdmin — ОТКЛЮЧЕНО. Раскомментировать при необходимости.
+  # Доступ только через Nginx + Basic Auth
   # ============================================================
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: autovip-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-      PGADMIN_CONFIG_PROXY_X_FOR_COUNT: "1"
-      PGADMIN_CONFIG_PROXY_X_PROTO_COUNT: "1"
-      PGADMIN_CONFIG_PROXY_X_HOST_COUNT: "1"
-      PGADMIN_CONFIG_WTF_CSRF_SSL_STRICT: "False"
-      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
-      SCRIPT_NAME: /admin
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    networks:
-      - frontend-network
-      - backend-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    mem_limit: 256m
-    memswap_limit: 384m
-    cpus: 0.3
-    pids_limit: 128
-    oom_score_adj: 300
-    labels:
-      com.centurylinklabs.watchtower.enable: "false"
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: autovip-pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+  #     PGADMIN_CONFIG_PROXY_X_FOR_COUNT: "1"
+  #     PGADMIN_CONFIG_PROXY_X_PROTO_COUNT: "1"
+  #     PGADMIN_CONFIG_PROXY_X_HOST_COUNT: "1"
+  #     PGADMIN_CONFIG_WTF_CSRF_SSL_STRICT: "False"
+  #     PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+  #     SCRIPT_NAME: /pgadmin
+  #   volumes:
+  #     - pgadmin-data:/var/lib/pgadmin
+  #   networks:
+  #     - frontend-network
+  #     - backend-network
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   mem_limit: 256m
+  #   memswap_limit: 384m
+  #   cpus: 0.3
+  #   pids_limit: 128
+  #   oom_score_adj: 300
+  #   labels:
+  #     com.centurylinklabs.watchtower.enable: "false"
 
   # ============================================================
-  # Backend — FastAPI (only accessible via Nginx)
+  # Backend — FastAPI (только через Nginx, порты не пробрасываются)
   # ============================================================
   backend:
     image: localhost:5000/autovip-backend:latest
@@ -139,6 +140,11 @@ services:
     environment:
       DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
       SECRET_KEY: "${SECRET_KEY:-autovip-default-secret-change-me}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-autovip-jwt-secret-change-me-32chars}"
+      JWT_ALGORITHM: "${JWT_ALGORITHM:-HS256}"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "${ACCESS_TOKEN_EXPIRE_MINUTES:-30}"
+      REFRESH_TOKEN_EXPIRE_DAYS: "${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
       APP_ENV: production
       DB_POOL_SIZE: 5
       DB_MAX_OVERFLOW: 3
@@ -158,32 +164,33 @@ services:
       com.centurylinklabs.watchtower.enable: "true"
 
   # ============================================================
-  # Docker Registry — приватный реестр (localhost:5000 + Nginx /v2/)
+  # Docker Registry — ОТКЛЮЧЕНО. Раскомментировать при необходимости.
+  # Приватный реестр (localhost:5000 + Nginx /v2/)
   # ============================================================
-  registry:
-    image: registry:2
-    container_name: autovip-registry
-    ports:
-      - "127.0.0.1:5000:5000"
-    environment:
-      REGISTRY_AUTH: htpasswd
-      REGISTRY_AUTH_HTPASSWD_REALM: "AutoVIP Private Registry"
-      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
-      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
-      REGISTRY_STORAGE_DELETE_ENABLED: "true"
-    volumes:
-      - registry-data:/var/lib/registry
-      - ./registry/auth:/auth:ro
-    networks:
-      - frontend-network
-    restart: unless-stopped
-    mem_limit: 64m
-    memswap_limit: 128m
-    cpus: 0.25
-    pids_limit: 64
-    oom_score_adj: 200
-    labels:
-      com.centurylinklabs.watchtower.enable: "false"
+  # registry:
+  #   image: registry:2
+  #   container_name: autovip-registry
+  #   ports:
+  #     - "127.0.0.1:5000:5000"
+  #   environment:
+  #     REGISTRY_AUTH: htpasswd
+  #     REGISTRY_AUTH_HTPASSWD_REALM: "AutoVIP Private Registry"
+  #     REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+  #     REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+  #     REGISTRY_STORAGE_DELETE_ENABLED: "true"
+  #   volumes:
+  #     - registry-data:/var/lib/registry
+  #     - ./registry/auth:/auth:ro
+  #   networks:
+  #     - frontend-network
+  #   restart: unless-stopped
+  #   mem_limit: 64m
+  #   memswap_limit: 128m
+  #   cpus: 0.25
+  #   pids_limit: 64
+  #   oom_score_adj: 200
+  #   labels:
+  #     com.centurylinklabs.watchtower.enable: "false"
 
   # ============================================================
   # Watchtower — обновляет только контейнеры с label enable=true
